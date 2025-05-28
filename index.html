@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Touch the Numbers</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      margin: 0;
+      background-color: #000000;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+      min-height: 100vh;
+    }
+    #game-container {
+      text-align: center;
+      position: relative;
+      margin: 20px auto;
+      width: 95vw;
+      max-width: 370px;
+      touch-action: manipulation;
+    }
+    #grid {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      grid-gap: 5px;
+      background-color: #000000;
+      border-radius: 15px;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      touch-action: none;
+    }
+    .cell {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background-image: linear-gradient(to bottom, #ffb700 0%, #ffd700 50%, #ffb700 100%);
+      color: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8vw;
+      font-weight: bold;
+      border-radius: 15px;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      transition: background-color 0.2s;
+      touch-action: manipulation;
+    }
+    .cell.correct {
+      background-color: #555;
+      background-image: none;
+      color: #000;
+    }
+    .cell.incorrect {
+      background-color: #ff6347;
+      background-image: none;
+    }
+    #play-button, #play-again-button, #restart-button, #leaderboard-button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 22px;
+      background-color: #1035ac;
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      touch-action: manipulation;
+    }
+    #play-again-button {
+      display: none;
+    }
+    #restart-button {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: none;
+      font-size: 14px;
+      padding: 6px 10px;
+    }
+    #leaderboard-button {
+      font-size: 14px;
+      padding: 6px 10px;
+      margin-left: 10px;
+      margin-top: 30px;
+    }
+    #timer, #high-score {
+      font-size: 18px;
+      margin: 10px 0;
+      color: #ffffff;
+    }
+    #countdown {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 210px;
+      color: white;
+      z-index: 10;
+      display: none;
+      width: 100%;
+      text-align: center;
+      pointer-events: none;
+    }
+    #go-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: black;
+      opacity: 1;
+      z-index: 9;
+      display: none;
+    }
+    #leaderboard-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.8);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 20;
+    }
+    #leaderboard {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 300px;
+      width: 90%;
+      color: #000;
+    }
+    #leaderboard h2 {
+      margin-top: 0;
+      text-align: center;
+    }
+    #leaderboard table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    #leaderboard th, #leaderboard td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+    #name-input {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    #submit-score, #close-leaderboard {
+      padding: 8px 16px;
+      background-color: #1035ac;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      margin: 5px;
+    }
+    #loading-message {
+      text-align: center;
+      color: #666;
+      margin: 10px 0;
+    }
+    @keyframes flashHighlight {
+      0% { background-color: #87ceeb; color: #000; }
+      100% { background-color: transparent; color: #fff; }
+    }
+    .highlight-flash {
+      animation: flashHighlight 1.8s ease-out;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <div id="high-score">Best: --</div>
+    <div id="timer">Time: 0.00s</div>
+    <div id="grid"></div>
+    <div id="countdown"></div>
+    <div id="go-overlay"></div>
+    <button id="play-button">Play</button>
+    <button id="play-again-button">Play Again</button>
+    <button id="restart-button">Restart</button>
+    <button id="leaderboard-button">Leaderboard</button>
+    <div id="leaderboard-overlay">
+      <div id="leaderboard">
+        <h2>Leaderboard</h2>
+        <div id="loading-message" style="display: none;">Loading...</div>
+        <table id="leaderboard-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Name</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-body"></tbody>
+        </table>
+        <div id="score-entry" style="display: none;">
+          <p><strong>New Personal Best! Enter your name for the leaderboard:</strong></p>
+          <input type="text" id="name-input" placeholder="Enter your name" maxlength="20">
+          <button id="submit-score">Submit Score</button>
+        </div>
+        <button id="close-leaderboard">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <audio id="success-sound"></audio>
+  <audio id="buzzer-sound"></audio>
+  <audio id="go-sound"></audio>
+  <audio id="countdown-sound"></audio>
+  <audio id="win-sound"></audio>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      console.log('DOM fully loaded');
+
+      // Initialize Supabase with error handling
+      let supabase;
+      try {
+        supabase = window.supabase.createClient(
+          'https://ioprcdcbykaugeqkqdpw.supabase.co',
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvcHJjZGNieWthdWdlcWtxZHB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgyNzI1NzksImV4cCI6MjA2Mzg0ODU3OX0.s18siAVcS16DvwgR-6Fi899kca1n7Par_mzZ4SJ3FyU'
+        );
+        console.log('Supabase initialized successfully');
+        
+        // Test connection
+        const { data, error } = await supabase.from('leaderboard').select('count').limit(1);
+        if (error) {
+          console.error('Supabase connection test failed:', error);
+          supabase = null;
+        } else {
+          console.log('Supabase connection test successful');
+        }
+      } catch (error) {
+        console.error('Failed to initialize Supabase:', error);
+        supabase = null;
+      }
+
+      // DOM elements
+      const elements = {
+        grid: document.getElementById('grid'),
+        playButton: document.getElementById('play-button'),
+        playAgainButton: document.getElementById('play-again-button'),
+        restartButton: document.getElementById('restart-button'),
+        leaderboardButton: document.getElementById('leaderboard-button'),
+        countdownElement: document.getElementById('countdown'),
+        timerElement: document.getElementById('timer'),
+        highScoreElement: document.getElementById('high-score'),
+        goOverlay: document.getElementById('go-overlay'),
+        leaderboardOverlay: document.getElementById('leaderboard-overlay'),
+        leaderboardBody: document.getElementById('leaderboard-body'),
+        scoreEntry: document.getElementById('score-entry'),
+        nameInput: document.getElementById('name-input'),
+        submitScoreButton: document.getElementById('submit-score'),
+        closeLeaderboardButton: document.getElementById('close-leaderboard'),
+        loadingMessage: document.getElementById('loading-message'),
+        successSound: document.getElementById('success-sound'),
+        buzzerSound: document.getElementById('buzzer-sound'),
+        goSound: document.getElementById('go-sound'),
+        countdownSound: document.getElementById('countdown-sound'),
+        winSound: document.getElementById('win-sound')
+      };
+
+      // Check for missing DOM elements
+      for (const [key, element] of Object.entries(elements)) {
+        if (!element) {
+          console.error(`DOM element not found: ${key}`);
+          return;
+        }
+      }
+
+      // Load audio files
+      async function loadAudio(audioElement, url) {
+        return new Promise((resolve, reject) => {
+          audioElement.src = url;
+          audioElement.load();
+          audioElement.onloadeddata = () => resolve();
+          audioElement.onerror = () => reject(new Error(`Failed to load audio: ${url}`));
+        });
+      }
+
+      try {
+        await Promise.all([
+          loadAudio(elements.successSound, 'https://raw.githubusercontent.com/TheDepression/Sounds/main/fclick1.mp3'),
+          loadAudio(elements.buzzerSound, 'https://raw.githubusercontent.com/TheDepression/Sounds/main/fbuzz.mp3'),
+          loadAudio(elements.goSound, 'https://raw.githubusercontent.com/TheDepression/Sounds/main/Startup.mp3'),
+          loadAudio(elements.countdownSound, 'https://raw.githubusercontent.com/TheDepression/Sounds/main/tekunodo2.mp3'),
+          loadAudio(elements.winSound, 'https://raw.githubusercontent.com/TheDepression/Sounds/main/Win.mp3')
+        ]);
+        console.log('All audio files loaded successfully');
+      } catch (error) {
+        console.error('Audio loading failed:', error);
+        // Continue without audio
+      }
+
+      function playAudio(audioElement) {
+        audioElement.play().catch(e => console.log('Audio play failed:', e));
+      }
+
+      let numbers = [];
+      let currentNumber = 1;
+      let timer = 0;
+      let startTime = 0;
+      let timerInterval;
+      let highScore = Infinity;
+      try {
+        const storedScore = JSON.parse(localStorage.getItem('highScore'));
+        highScore = storedScore !== null ? parseFloat(storedScore) : Infinity;
+        console.log('localStorage highScore:', highScore);
+      } catch (e) {
+        console.log('localStorage access failed, using default highScore:', e);
+      }
+      let isInteractive = false;
+      let isPaused = false;
+      let currentScore = null;
+      let isNewPersonalBest = false; // Track if current game is a personal best
+
+      elements.highScoreElement.textContent = highScore === Infinity ? 'Best: --' : `Best: ${highScore.toFixed(2)}s`;
+
+      // Fetch leaderboard
+      async function fetchLeaderboard() {
+        if (!supabase) {
+          console.log('Supabase not available');
+          return [];
+        }
+        try {
+          console.log('Fetching leaderboard...');
+          const { data, error } = await supabase
+            .from('leaderboard')
+            .select('name, score')
+            .order('score', { ascending: true })
+            .limit(10);
+          
+          if (error) {
+            console.error('Supabase error:', error);
+            throw error;
+          }
+          console.log('Leaderboard data:', data);
+          return data || [];
+        } catch (error) {
+          console.error('Error fetching leaderboard:', error);
+          return [];
+        }
+      }
+
+      // Remove duplicate entries for the same player name (keeping the better score)
+      async function removeDuplicateEntry(playerName, newScore) {
+        if (!supabase) {
+          console.log('Supabase not available for duplicate removal');
+          return;
+        }
+        try {
+          console.log('Checking for duplicate entries for:', playerName, 'with new score:', newScore);
+          
+          // Find existing entries for this player name
+          const { data: existingEntries, error: fetchError } = await supabase
+            .from('leaderboard')
+            .select('*')
+            .ilike('name', playerName)
+            .order('score', { ascending: true });
+          
+          if (fetchError) {
+            console.error('Error fetching existing entries:', fetchError);
+            return;
+          }
+          
+          console.log('Existing entries for', playerName, ':', existingEntries);
+          
+          // If there are existing entries, remove the worse ones (higher scores)
+          if (existingEntries && existingEntries.length > 0) {
+            const entriesToRemove = existingEntries.filter(entry => entry.score > newScore);
+            
+            console.log('Entries to remove (worse scores):', entriesToRemove);
+            
+            if (entriesToRemove.length > 0) {
+              // Delete each worse entry
+              for (const entry of entriesToRemove) {
+                console.log('Deleting entry with score:', entry.score, 'ID:', entry.id);
+                const { error: deleteError } = await supabase
+                  .from('leaderboard')
+                  .delete()
+                  .eq('id', entry.id);
+                
+                if (deleteError) {
+                  console.error('Error deleting duplicate entry:', deleteError);
+                } else {
+                  console.log('Successfully deleted entry ID:', entry.id);
+                }
+              }
+            } else {
+              console.log('No worse entries found to remove');
+            }
+          } else {
+            console.log('No existing entries found for this player name');
+          }
+        } catch (error) {
+          console.error('Error in removeDuplicateEntry:', error);
+        }
+      }
+
+      // Submit score (only called for personal bests)
+      async function submitScore(playerName, score) {
+        if (!supabase) {
+          console.log('Supabase not available for score submission');
+          return;
+        }
+        try {
+          console.log('Submitting personal best score:', playerName, score);
+          
+          // Remove any duplicate entries with worse scores first
+          await removeDuplicateEntry(playerName, score);
+          
+          // Insert the new score
+          const { data, error } = await supabase
+            .from('leaderboard')
+            .insert([{ name: playerName, score: score }]);
+          
+          if (error) {
+            console.error('Score submission error:', error);
+            throw error;
+          }
+          console.log('Personal best score submitted successfully:', data);
+          
+          // Refresh leaderboard display
+          await displayLeaderboard();
+        } catch (error) {
+          console.error('Error submitting score:', error);
+          alert('Failed to submit score. Please try again.');
+        }
+      }
+
+      // Display leaderboard function
+      async function displayLeaderboard() {
+        try {
+          elements.loadingMessage.style.display = 'block';
+          elements.leaderboardBody.innerHTML = '';
+          
+          const leaderboard = await fetchLeaderboard();
+          elements.loadingMessage.style.display = 'none';
+          
+          if (leaderboard.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = '<td colspan="3" style="text-align: center;">No scores yet!</td>';
+            elements.leaderboardBody.appendChild(row);
+          } else {
+            leaderboard.forEach((entry, index) => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${entry.name || 'Anonymous'}</td>
+                <td>${entry.score.toFixed(2)}s</td>
+              `;
+              elements.leaderboardBody.appendChild(row);
+            });
+          }
+        } catch (error) {
+          console.error('Error displaying leaderboard:', error);
+          elements.loadingMessage.style.display = 'none';
+          elements.leaderboardBody.innerHTML = '<tr><td colspan="3" style="text-align: center;">Error loading leaderboard</td></tr>';
+        }
+      }
+
+      // Show leaderboard overlay
+      async function showLeaderboard(showScoreEntry = false) {
+        await displayLeaderboard();
+        elements.scoreEntry.style.display = showScoreEntry ? 'block' : 'none';
+        elements.leaderboardOverlay.style.display = 'flex';
+        if (showScoreEntry) {
+          elements.nameInput.focus();
+        }
+      }
+
+      function initGrid() {
+        console.log('initGrid started');
+        try {
+          elements.grid.innerHTML = '';
+          numbers = shuffleArray([...Array(25).keys()].map(i => i + 1));
+          for (let i = 0; i < 25; i++) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            cell.textContent = numbers[i];
+            cell.dataset.number = numbers[i];
+            cell.addEventListener('touchstart', (e) => {
+              e.preventDefault();
+              console.log(`Cell ${numbers[i]} touched`);
+              handleCellClick(cell);
+            });
+            cell.addEventListener('click', (e) => {
+              e.preventDefault();
+              console.log(`Cell ${numbers[i]} clicked`);
+              handleCellClick(cell);
+            });
+            elements.grid.appendChild(cell);
+          }
+          console.log('initGrid completed');
+        } catch (error) {
+          console.error('Error in initGrid:', error);
+        }
+      }
+
+      function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+      }
+
+      // Handle game completion - ONLY show leaderboard for personal bests
+      async function handleCellClick(cell) {
+        if (!isInteractive || isPaused) return;
+
+        const number = parseInt(cell.dataset.number);
+        if (number === currentNumber) {
+          cell.classList.add('correct');
+          playAudio(elements.successSound);
+          currentNumber++;
+          
+          // Game completed
+          if (currentNumber > 25) {
+            clearInterval(timerInterval);
+            currentScore = timer;
+            const previousHighScore = highScore;
+            
+            // Check if this is a new personal best
+            isNewPersonalBest = timer < previousHighScore;
+            
+            // Update local high score only if it's a personal best
+            if (isNewPersonalBest) {
+              highScore = timer;
+              playAudio(elements.winSound);
+              elements.highScoreElement.classList.add('highlight-flash');
+              setTimeout(() => {
+                elements.highScoreElement.classList.remove('highlight-flash');
+              }, 2000);
+              
+              try {
+                localStorage.setItem('highScore', JSON.stringify(highScore));
+                console.log('New personal best saved:', highScore);
+              } catch (e) {
+                console.log('Failed to save high score:', e);
+              }
+              
+              elements.highScoreElement.textContent = `Best: ${highScore.toFixed(2)}s`;
+              
+              // Only show leaderboard entry for personal bests
+              console.log('New personal best achieved! Showing leaderboard entry.');
+              await showLeaderboard(true);
+            } else {
+              console.log('Not a personal best. Score:', timer, 'vs Best:', previousHighScore);
+              console.log('Leaderboard will not be shown.');
+            }
+            
+            elements.playAgainButton.style.display = 'block';
+            elements.restartButton.style.display = 'none';
+            isInteractive = false;
+          }
+        } else {
+          cell.classList.add('incorrect');
+          playAudio(elements.buzzerSound);
+          isPaused = true;
+          setTimeout(() => {
+            cell.classList.remove('incorrect');
+            isPaused = false;
+          }, 100);
+        }
+      }
+
+      function startCountdown() {
+        console.log('startCountdown started');
+        try {
+          let count = 3;
+          elements.countdownElement.style.display = 'block';
+          elements.goOverlay.style.display = 'block';
+          elements.countdownElement.textContent = count;
+          playAudio(elements.countdownSound);
+
+          const countdownInterval = setInterval(() => {
+            count--;
+            if (count > 0) {
+              elements.countdownElement.textContent = count;
+              playAudio(elements.countdownSound);
+            } else if (count === 0) {
+              elements.countdownElement.textContent = 'Go';
+              playAudio(elements.goSound);
+            } else {
+              elements.countdownElement.style.display = 'none';
+              elements.goOverlay.style.display = 'none';
+              clearInterval(countdownInterval);
+              isInteractive = true;
+              console.log('Calling startTimer');
+              startTimer();
+            }
+          }, 1000);
+        } catch (error) {
+          console.error('Error in startCountdown:', error);
+        }
+      }
+
+      function startTimer() {
+        clearInterval(timerInterval);
+        startTime = performance.now();
+        timerInterval = setInterval(() => {
+          const now = performance.now();
+          timer = (now - startTime) / 1000;
+          elements.timerElement.textContent = `Time: ${timer.toFixed(2)}s`;
+        }, 100);
+      }
+
+      function resetGame() {
+        console.log('resetGame started');
+        try {
+          clearInterval(timerInterval);
+          timer = 0;
+          currentNumber = 1;
+          isInteractive = false;
+          isPaused = false;
+          isNewPersonalBest = false;
+          elements.timerElement.textContent = `Time: 0.00s`;
+          elements.playAgainButton.style.display = 'none';
+          elements.restartButton.style.display = 'none';
+          elements.leaderboardOverlay.style.display = 'none';
+          elements.scoreEntry.style.display = 'none';
+          elements.nameInput.value = '';
+          console.log('Calling initGrid');
+          initGrid();
+          console.log('initGrid completed');
+          elements.restartButton.style.display = 'block';
+          console.log('Calling startCountdown');
+          startCountdown();
+        } catch (error) {
+          console.error('Error in resetGame:', error);
+        }
+      }
+
+      // Button event listeners
+      function addButtonListeners(button, action, name) {
+        button.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          console.log(`${name} button touched`);
+          try {
+            action();
+          } catch (error) {
+            console.error(`Error in ${name} touchstart:`, error);
+          }
+        });
+        button.addEventListener('click', (e) => {
+          e.preventDefault();
+          console.log(`${name} button clicked`);
+          try {
+            action();
+          } catch (error) {
+            console.error(`Error in ${name} click:`, error);
+          }
+        });
+      }
+
+      addButtonListeners(elements.playButton, () => {
+        elements.playButton.style.display = 'none';
+        resetGame();
+      }, 'Play');
+
+      addButtonListeners(elements.playAgainButton, resetGame, 'Play Again');
+
+      addButtonListeners(elements.restartButton, resetGame, 'Restart');
+
+      // Leaderboard button shows leaderboard without score entry
+      addButtonListeners(elements.leaderboardButton, () => {
+        showLeaderboard(false);
+      }, 'Leaderboard');
+
+      // Submit score functionality (only for personal bests)
+      addButtonListeners(elements.submitScoreButton, async () => {
+        const playerName = elements.nameInput.value.trim() || 'Anonymous';
+        if (currentScore && isNewPersonalBest) {
+          await submitScore(playerName, currentScore);
+          elements.scoreEntry.style.display = 'none';
+          elements.nameInput.value = '';
+          currentScore = null;
+          isNewPersonalBest = false;
+        }
+      }, 'Submit Score');
+
+      addButtonListeners(elements.closeLeaderboardButton, () => {
+        elements.leaderboardOverlay.style.display = 'none';
+        elements.scoreEntry.style.display = 'none';
+        elements.nameInput.value = '';
+      }, 'Close Leaderboard');
+
+      // Allow Enter key to submit score
+      elements.nameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          elements.submitScoreButton.click();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
