@@ -314,7 +314,7 @@
       let timerInterval;
       let highScore = Infinity;
       try {
-        const storedScore = JSON.parse(localStorage.getItem('highScore'));
+        const storedScore = JSON.parse(localStorage.getItem('phighScore'));
         highScore = storedScore !== null ? parseFloat(storedScore) : Infinity;
         console.log('localStorage highScore:', highScore);
       } catch (e) {
@@ -545,7 +545,7 @@
               }, 2000);
               
               try {
-                localStorage.setItem('highScore', JSON.stringify(highScore));
+                localStorage.setItem('phighScore', JSON.stringify(highScore));
                 console.log('New personal best saved:', highScore);
               } catch (e) {
                 console.log('Failed to save high score:', e);
