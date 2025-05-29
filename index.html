@@ -665,7 +665,7 @@
           elements.restartButton.style.display = 'none';
           elements.leaderboardOverlay.style.display = 'none';
           elements.scoreEntry.style.display = 'none';
-          elements.nameInput.value = '';
+          // Don't reset nameInput - keep the stored name
           console.log('Calling initGrid');
           initGrid();
           console.log('initGrid completed');
