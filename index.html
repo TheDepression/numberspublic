@@ -330,13 +330,17 @@
       let startTime = 0;
       let timerInterval;
       let highScore = Infinity;
+      let storedPlayerName = '';
+      
       try {
         const storedScore = JSON.parse(localStorage.getItem('phighScore'));
         highScore = storedScore !== null ? parseFloat(storedScore) : Infinity;
-        console.log('localStorage highScore:', highScore);
+        storedPlayerName = localStorage.getItem('pplayerName') || '';
+        console.log('localStorage highScore:', highScore, 'playerName:', storedPlayerName);
       } catch (e) {
         console.log('localStorage access failed, using default highScore:', e);
       }
+      
       let isInteractive = false;
       let isPaused = false;
       let currentScore = null;
@@ -492,8 +496,21 @@
         await displayLeaderboard();
         elements.scoreEntry.style.display = showScoreEntry ? 'block' : 'none';
         elements.leaderboardOverlay.style.display = 'flex';
+        
         if (showScoreEntry) {
-          elements.nameInput.focus();
+          if (storedPlayerName) {
+            // User has played before - show their locked name
+            elements.nameInput.value = storedPlayerName;
+            elements.nameInput.readOnly = true;
+            elements.nameInput.style.backgroundColor = '#f0f0f0';
+            elements.scoreEntry.querySelector('p').innerHTML = '<strong>New Personal Best! Submitting as: ' + storedPlayerName + '</strong>';
+          } else {
+            // First time - allow name entry
+            elements.nameInput.value = '';
+            elements.nameInput.readOnly = false;
+            elements.nameInput.style.backgroundColor = '#fff';
+            elements.nameInput.focus();
+          }
         }
       }
 
@@ -698,7 +715,18 @@
 
       // Submit score functionality (only for personal bests)
       addButtonListeners(elements.submitScoreButton, async () => {
-        const playerName = elements.nameInput.value.trim() || 'Anonymous';
+        let playerName;
+        
+        if (storedPlayerName) {
+          // Use stored name
+          playerName = storedPlayerName;
+        } else {
+          // First time - save the name
+          playerName = elements.nameInput.value.trim() || 'Anonymous';
+          storedPlayerName = playerName;
+          localStorage.setItem('pplayerName', playerName);
+        }
+        
         if (currentScore && isNewPersonalBest) {
           await submitScore(playerName, currentScore);
           elements.scoreEntry.style.display = 'none';
