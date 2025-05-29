@@ -642,7 +642,24 @@
           console.error('Error in resetGame:', error);
         }
       }
-
+// Cleanup function - removes duplicate names, keeps best scores
+async function cleanupDuplicateScores() {
+  if (!supabase) {
+    console.log('Supabase not available for cleanup');
+    return;
+  }
+  try {
+    console.log('Running leaderboard cleanup...');
+    const { data, error } = await supabase.rpc('cleanup_duplicate_scores');
+    if (error) {
+      console.error('Cleanup error:', error);
+    } else {
+      console.log('Leaderboard cleanup completed successfully');
+    }
+  } catch (error) {
+    console.error('Error running cleanup:', error);
+  }
+}
       // Button event listeners
       function addButtonListeners(button, action, name) {
         button.addEventListener('touchstart', (e) => {
@@ -680,16 +697,20 @@
       }, 'Leaderboard');
 
       // Submit score functionality (only for personal bests)
-      addButtonListeners(elements.submitScoreButton, async () => {
-        const playerName = elements.nameInput.value.trim() || 'Anonymous';
-        if (currentScore && isNewPersonalBest) {
-          await submitScore(playerName, currentScore);
-          elements.scoreEntry.style.display = 'none';
-          elements.nameInput.value = '';
-          currentScore = null;
-          isNewPersonalBest = false;
-        }
-      }, 'Submit Score');
+    addButtonListeners(elements.submitScoreButton, async () => {
+  const playerName = elements.nameInput.value.trim() || 'Anonymous';
+  if (currentScore && isNewPersonalBest) {
+    await submitScore(playerName, currentScore);
+    
+    // Clean up duplicates after submitting the score
+    await cleanupDuplicateScores();
+    
+    elements.scoreEntry.style.display = 'none';
+    elements.nameInput.value = '';
+    currentScore = null;
+    isNewPersonalBest = false;
+  }
+}, 'Submit Score');
 
       addButtonListeners(elements.closeLeaderboardButton, () => {
         elements.leaderboardOverlay.style.display = 'none';
