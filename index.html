@@ -136,16 +136,33 @@
       max-width: 300px;
       width: 90%;
       color: #000;
+      max-height: 80vh;
+      overflow-y: auto;
     }
     #leaderboard h2 {
       margin-top: 0;
       text-align: center;
     }
-    #leaderboard table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 20px;
-    }
+    #leaderboard-table {
+  display: block;
+  max-height: 50vh; /* NEW - Limit table height */
+  overflow-y: auto; /* NEW - Make table scrollable */
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+#leaderboard-table thead {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+#leaderboard-table tbody {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
     #leaderboard th, #leaderboard td {
       padding: 8px;
       text-align: left;
