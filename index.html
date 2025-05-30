@@ -360,7 +360,7 @@
             .from('leaderboard')
             .select('name, score')
             .order('score', { ascending: true })
-            .limit(25);
+            .limit(50);
           
           if (error) {
             console.error('Supabase error:', error);
